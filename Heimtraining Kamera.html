@@ -1,0 +1,418 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Heimtraining Kamera</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600&display=swap">
+<style>
+:root {
+  --bg: #0e1217; --surface: #171d25; --surface-2: #232b35; --fg: #eef1f4; --muted: #9aa5b1; --line: #2a333e;
+  --accent: #7f9bff; --on-accent: #0b1020; --good: #3fcfbc; --warn: #ffb454; --bad: #ff6b6b;
+  --display: "Barlow Condensed", "Arial Narrow", Impact, sans-serif;
+  --body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 16px; line-height: 1.45;
+  padding: env(safe-area-inset-top, 0) max(16px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0) max(16px, env(safe-area-inset-left, 0px)); }
+h1, h2, h3 { font-family: var(--display); text-transform: uppercase; font-weight: 800; letter-spacing: .01em; margin: 0; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+[hidden] { display: none !important; }
+.label { font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.num { font-variant-numeric: tabular-nums; }
+.wrap { max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; padding-block: 16px 32px; }
+.primary { background: var(--accent); color: var(--on-accent); font-family: var(--display); text-transform: uppercase; font-weight: 800; font-size: 24px; letter-spacing: .04em; padding: 14px; border-radius: 12px; width: 100%; }
+.ghost { border: 2px solid var(--line); border-radius: 12px; padding: 12px 16px; font-weight: 600; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+
+/* home */
+.top h1 { font-size: 40px; line-height: .95; }
+.top p { color: var(--muted); margin: 6px 0 0; }
+.rank { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: end; }
+.rank h2 { font-size: 40px; line-height: 1; color: var(--accent); }
+.rank .pts { font-family: var(--display); font-weight: 800; font-size: 34px; line-height: 1; text-align: right; }
+.bar { grid-column: 1 / -1; height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; margin-top: 8px; }
+.bar i { display: block; height: 100%; background: var(--accent); }
+.rank small { grid-column: 1 / -1; color: var(--muted); }
+.week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.day { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.dot { width: 100%; max-width: 38px; aspect-ratio: 1; border-radius: 50%; border: 2px solid var(--line); display: grid; place-items: center; }
+.dot.done { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.dot.today { border-color: var(--fg); }
+.list { display: flex; flex-direction: column; gap: 10px; }
+.item { text-align: left; width: 100%; display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+.item:hover { border-color: var(--accent); }
+.item h3 { font-size: 26px; line-height: 1; }
+.item p { margin: 0; color: var(--muted); font-size: 14px; }
+.item .go { grid-row: 1 / span 2; grid-column: 2; font-family: var(--display); font-weight: 700; font-size: 20px; color: var(--accent); }
+.badges { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.badge { border: 1px solid var(--line); border-radius: 12px; padding: 12px; font-size: 14px; background: var(--surface); }
+.badge b { display: block; font-size: 15px; }
+.badge.locked { opacity: .45; }
+.note { color: var(--muted); font-size: 13px; }
+.err { background: color-mix(in srgb, var(--bad) 18%, var(--surface)); border: 1px solid var(--bad); border-radius: 12px; padding: 14px; }
+
+/* workout */
+#work { position: fixed; inset: 0; background: #000; display: flex; flex-direction: column; z-index: 5;
+  padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0); }
+.stage { position: relative; flex: 1; min-height: 0; overflow: hidden; background: #000; }
+.stage video, .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.hud-top { position: absolute; top: 0; left: 0; right: 0; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px; background: linear-gradient(#000a, #0000); }
+.hud-top h2 { font-size: 26px; }
+.steps { display: flex; gap: 4px; padding: 0 16px; position: absolute; top: 54px; left: 0; right: 0; }
+.steps i { flex: 1; height: 4px; border-radius: 2px; background: #fff3; }
+.steps i.on { background: var(--accent); }
+.steps i.cur { background: #fff; }
+.hud-mid { position: absolute; left: 0; right: 0; bottom: 14px; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
+.count { font-family: var(--display); font-weight: 800; font-size: clamp(96px, 30vw, 150px); line-height: .9; text-shadow: 0 2px 16px #000a; }
+.count small { font-size: .32em; color: var(--muted); margin-left: 6px; }
+.fb { background: #000b; padding: 8px 16px; border-radius: 999px; font-weight: 600; font-size: 17px; }
+.fb.good { color: var(--good); } .fb.warn { color: var(--warn); } .fb.bad { color: var(--bad); }
+.ctrl { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; padding: 10px 16px 14px; background: var(--bg); }
+.ctrl button { padding: 12px 4px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); font-weight: 600; font-size: 14px; }
+.ctrl .stop { color: var(--bad); }
+.overlay { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; background: #000c; padding: 24px; }
+.overlay > div { max-width: 360px; display: flex; flex-direction: column; gap: 14px; align-items: center; }
+.overlay h2 { font-size: 40px; }
+.spin { width: 36px; height: 36px; border-radius: 50%; border: 4px solid var(--line); border-top-color: var(--accent); animation: sp 1s linear infinite; }
+@keyframes sp { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation-duration: 3s; } }
+
+/* done */
+.done h2 { font-size: 64px; line-height: .9; color: var(--accent); }
+.sum { display: flex; gap: 24px; flex-wrap: wrap; }
+.sum b { font-family: var(--display); font-size: 36px; font-weight: 800; line-height: 1; display: block; }
+</style>
+</head>
+<body>
+
+<main class="wrap" id="home">
+  <div class="top">
+    <h1>Heimtraining</h1>
+    <p>Die Kamera zählt deine Wiederholungen. Das Video bleibt auf deinem Gerät.</p>
+  </div>
+  <div id="envwarn" class="err" hidden></div>
+  <div class="card rank" id="rank"></div>
+  <div>
+    <div class="label" style="margin-bottom:10px">Diese Woche</div>
+    <div class="week" id="week"></div>
+  </div>
+  <div>
+    <div class="label" style="margin-bottom:10px">Trainingspläne</div>
+    <div class="list" id="plans"></div>
+  </div>
+  <div>
+    <div class="label" style="margin-bottom:10px">Freies Training</div>
+    <div class="list" id="free"></div>
+  </div>
+  <div>
+    <div class="label" style="margin-bottom:10px">Erfolge</div>
+    <div class="badges" id="badges"></div>
+  </div>
+  <p class="note">Tipp: Handy auf Hüfthöhe fest anlehnen, ganzer Körper im Bild, gutes Licht. Kniebeugen von vorn, Liegestütze, Sit-ups und Plank von der Seite.</p>
+</main>
+
+<section id="work" hidden>
+  <div class="stage">
+    <video id="vid" playsinline muted></video>
+    <canvas id="cv"></canvas>
+    <div class="hud-top"><h2 id="exname"></h2><span class="label num" id="stepinfo"></span></div>
+    <div class="steps" id="steps"></div>
+    <div class="hud-mid">
+      <div class="count num" id="count">0</div>
+      <div class="fb" id="fb"></div>
+    </div>
+    <div class="overlay" id="ov"><div></div></div>
+  </div>
+  <div class="ctrl">
+    <button id="minus">−1</button>
+    <button id="plus">+1</button>
+    <button id="skip">Weiter</button>
+    <button id="stop" class="stop">Ende</button>
+  </div>
+</section>
+
+<main class="wrap done" id="done" hidden></main>
+
+<script type="module">
+/* ---------- Daten ---------- */
+const MP_VER = '0.10.14';
+const MP_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@' + MP_VER;
+const MODEL = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
+
+// Gelenkpunkte (MediaPipe Pose): 11/12 Schulter, 13/14 Ellbogen, 15/16 Handgelenk, 23/24 Hüfte, 25/26 Knie, 27/28 Knöchel
+const EX = {
+  squat:  { name: 'Kniebeugen',  unit: 'Wdh', pts: 10, joints: [[23,25,27],[24,26,28]], low: 100, high: 160, view: 'von vorn oder schräg',
+            tipLow: 'Tiefer gehen', tipOk: 'Sauber!' },
+  pushup: { name: 'Liegestütze', unit: 'Wdh', pts: 12, joints: [[11,13,15],[12,14,16]], low: 90, high: 155, view: 'von der Seite',
+            tipLow: 'Tiefer runter', tipOk: 'Sauber!' },
+  situp:  { name: 'Sit-ups',     unit: 'Wdh', pts: 10, joints: [[11,23,25],[12,24,26]], low: 85, high: 125, view: 'von der Seite',
+            tipLow: 'Höher kommen', tipOk: 'Sauber!' },
+  plank:  { name: 'Plank',       unit: 'Sek', pts: 2,  joints: [[11,23,27],[12,24,28]], hold: 155, view: 'von der Seite' }
+};
+const PLANS = [
+  { id: 'start', name: 'Einsteiger', desc: 'Kurz und machbar', steps: [['squat',10],['pushup',6],['situp',10],['plank',20]] },
+  { id: 'std',   name: 'Standard',   desc: 'Solide Runde für zu Hause', steps: [['squat',15],['pushup',12],['situp',15],['plank',40]] },
+  { id: 'pro',   name: 'Stark',      desc: 'Für Geübte', steps: [['squat',25],['pushup',20],['situp',25],['plank',60]] }
+];
+const RANKS = [['Starter',0],['Bronze',300],['Silber',1000],['Gold',2500],['Platin',6000],['Diamant',12000]];
+const ACH = [
+  ['first', 'Erster Schritt', 'Erste Einheit abgeschlossen', s => s.sessions >= 1],
+  ['r50', '50 Wiederholungen', 'Insgesamt 50 Wdh', s => s.reps >= 50],
+  ['r250', '250 Wiederholungen', 'Insgesamt 250 Wdh', s => s.reps >= 250],
+  ['sq100', 'Beinpower', '100 Kniebeugen gesamt', s => s.byEx.squat >= 100],
+  ['pu50', 'Drückerkönig', '50 Liegestütze gesamt', s => s.byEx.pushup >= 50],
+  ['pl60', 'Eisenbrett', '60 Sek. Plank am Stück', s => s.bestPlank >= 60],
+  ['st3', 'Dranbleiber', '3 Tage in Folge', s => s.streak >= 3],
+  ['st7', 'Wochenserie', '7 Tage in Folge', s => s.streak >= 7]
+];
+const DAYS = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+
+/* ---------- Speicher ---------- */
+let store = { sessions: [], got: [] };
+try { const s = JSON.parse(localStorage.getItem('ht-kamera') || 'null'); if (s) store = s; } catch (e) {}
+const persist = () => { try { localStorage.setItem('ht-kamera', JSON.stringify(store)); } catch (e) {} };
+const $ = id => document.getElementById(id);
+const dkey = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+
+function stats() {
+  const byEx = { squat: 0, pushup: 0, situp: 0, plank: 0 };
+  let pts = 0, reps = 0, bestPlank = 0;
+  store.sessions.forEach(s => {
+    pts += s.pts;
+    for (const k in s.res) {
+      if (k === 'plank') bestPlank = Math.max(bestPlank, s.res[k]);
+      else reps += s.res[k];
+      byEx[k] = (byEx[k] || 0) + s.res[k];
+    }
+  });
+  const days = new Set(store.sessions.map(s => s.d));
+  const d = new Date(); let streak = 0;
+  if (!days.has(dkey(d))) d.setDate(d.getDate() - 1);
+  while (days.has(dkey(d))) { streak++; d.setDate(d.getDate() - 1); }
+  return { pts, reps, byEx, bestPlank, streak, sessions: store.sessions.length, days };
+}
+
+/* ---------- Startseite ---------- */
+function renderHome() {
+  const st = stats();
+  let ri = 0; RANKS.forEach((r, i) => { if (st.pts >= r[1]) ri = i; });
+  const next = RANKS[ri + 1];
+  const pct = next ? Math.round((st.pts - RANKS[ri][1]) / (next[1] - RANKS[ri][1]) * 100) : 100;
+  $('rank').innerHTML = '<div><div class="label">Rang</div><h2>' + RANKS[ri][0] + '</h2></div><div class="pts num">' + st.pts + '<div class="label">Punkte</div></div>' +
+    '<div class="bar"><i style="width:' + pct + '%"></i></div>' +
+    '<small>' + (next ? 'Noch ' + (next[1] - st.pts) + ' Punkte bis ' + next[0] : 'Höchster Rang erreicht') + ' · ' + st.streak + ' Tage in Folge · ' + st.reps + ' Wdh gesamt</small>';
+  const now = new Date(), dow = (now.getDay() + 6) % 7, mon = new Date(now); mon.setDate(now.getDate() - dow);
+  $('week').innerHTML = DAYS.map((n, i) => {
+    const d = new Date(mon); d.setDate(mon.getDate() + i); const done = st.days.has(dkey(d));
+    return '<div class="day"><div class="dot' + (done ? ' done' : '') + (i === dow ? ' today' : '') + '">' + (done ? '✓' : '') + '</div>' + n + '</div>';
+  }).join('');
+  $('plans').innerHTML = PLANS.map(p => '<button class="item" data-plan="' + p.id + '"><h3>' + p.name + '</h3><p>' + p.desc + ' · ' +
+    p.steps.map(s => s[1] + (EX[s[0]].unit === 'Sek' ? ' s ' : '× ') + EX[s[0]].name).join(', ') + '</p><span class="go">Start →</span></button>').join('');
+  $('free').innerHTML = Object.keys(EX).map(k => '<button class="item" data-free="' + k + '"><h3>' + EX[k].name + '</h3><p>Kamera ' + EX[k].view + '</p><span class="go">Los →</span></button>').join('');
+  $('badges').innerHTML = ACH.map(a => '<div class="badge' + (store.got.includes(a[0]) ? '' : ' locked') + '"><b>' + a[1] + '</b>' + a[2] + '</div>').join('');
+}
+
+/* ---------- Kamera und Modell ---------- */
+let landmarker = null, stream = null, raf = 0, audio = null, lastVT = -1;
+const vid = $('vid'), cv = $('cv'), ctx = cv.getContext('2d');
+
+async function loadModel() {
+  if (landmarker) return;
+  const mod = await import(MP_URL + '/vision_bundle.mjs');
+  const fileset = await mod.FilesetResolver.forVisionTasks(MP_URL + '/wasm');
+  const base = { modelAssetPath: MODEL };
+  try { landmarker = await mod.PoseLandmarker.createFromOptions(fileset, { baseOptions: { ...base, delegate: 'GPU' }, runningMode: 'VIDEO', numPoses: 1 }); }
+  catch (e) { landmarker = await mod.PoseLandmarker.createFromOptions(fileset, { baseOptions: { ...base, delegate: 'CPU' }, runningMode: 'VIDEO', numPoses: 1 }); }
+}
+async function openCamera() {
+  stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
+  vid.srcObject = stream; await vid.play();
+}
+function closeCamera() {
+  cancelAnimationFrame(raf);
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = null; vid.srcObject = null;
+}
+
+/* ---------- Ton und Sprache ---------- */
+function beep(f, d) {
+  try { if (!audio) return; const o = audio.createOscillator(), g = audio.createGain(); o.frequency.value = f; o.connect(g); g.connect(audio.destination);
+    g.gain.setValueAtTime(.15, audio.currentTime); g.gain.exponentialRampToValueAtTime(.0001, audio.currentTime + d); o.start(); o.stop(audio.currentTime + d); } catch (e) {}
+}
+function say(t) { try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(String(t)); u.lang = 'de-DE'; u.rate = 1.1; speechSynthesis.speak(u); } catch (e) {} }
+
+/* ---------- Training ---------- */
+let run = null;
+const POSE_LINES = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28]];
+
+function angle(a, b, c, w, h) {
+  const v1 = [(a.x - b.x) * w, (a.y - b.y) * h], v2 = [(c.x - b.x) * w, (c.y - b.y) * h];
+  const dot = v1[0]*v2[0] + v1[1]*v2[1], m = Math.hypot(...v1) * Math.hypot(...v2);
+  if (!m) return null;
+  return Math.acos(Math.max(-1, Math.min(1, dot / m))) * 180 / Math.PI;
+}
+function measure(lm, joints, w, h) {
+  let best = null;
+  for (const j of joints) {
+    const p = j.map(i => lm[i]);
+    const vis = Math.min(...p.map(q => q.visibility ?? 0));
+    if (vis < 0.5) continue;
+    const a = angle(p[0], p[1], p[2], w, h);
+    if (a !== null && (!best || vis > best.vis)) best = { a, vis };
+  }
+  return best ? best.a : null;
+}
+
+function startStep(i) {
+  run.i = i; const [k, target] = run.plan[i];
+  run.ex = EX[k]; run.key = k; run.target = target; run.count = 0; run.sm = null;
+  run.cycle = false; run.min = 999; run.reached = false; run.holdT = 0; run.lastT = performance.now(); run.lock = 0;
+  $('exname').textContent = run.ex.name;
+  $('stepinfo').textContent = (i + 1) + ' / ' + run.plan.length;
+  $('steps').innerHTML = run.plan.map((_, n) => '<i class="' + (n < i ? 'on' : n === i ? 'cur' : '') + '"></i>').join('');
+  setFb('Stell dich so hin: ' + run.ex.view, '');
+  paintCount();
+}
+function paintCount() {
+  const c = run.key === 'plank' ? Math.floor(run.holdT) : run.count;
+  $('count').innerHTML = c + '<small>/ ' + run.target + (run.key === 'plank' ? ' s' : '') + '</small>';
+}
+function setFb(t, cls) { const f = $('fb'); f.textContent = t; f.className = 'fb ' + cls; f.hidden = !t; }
+
+function addRep(n) {
+  if (run.key === 'plank') return;
+  run.count = Math.max(0, run.count + n);
+  if (n > 0) { run.res[run.key] = (run.res[run.key] || 0) + n; run.pts += run.ex.pts * n; beep(720, .08); say(run.count); }
+  else { run.res[run.key] = Math.max(0, (run.res[run.key] || 0) + n); run.pts = Math.max(0, run.pts + run.ex.pts * n); }
+  paintCount(); checkDone();
+}
+function checkDone() {
+  const v = run.key === 'plank' ? run.holdT : run.count;
+  if (v >= run.target && !run.lock) {
+    run.lock = 1; beep(880, .3); setFb('Geschafft!', 'good');
+    setTimeout(() => { if (run) next(); }, 1200);
+  }
+}
+function next() {
+  if (run.i + 1 >= run.plan.length) finish(); else startStep(run.i + 1);
+}
+
+function update(lm, w, h, now) {
+  const dt = Math.min(0.2, (now - run.lastT) / 1000); run.lastT = now;
+  if (run.lock) return;
+  const raw = measure(lm, run.ex.joints, w, h);
+  if (raw === null) { setFb('Ganzen Körper ins Bild bringen', 'warn'); return; }
+  run.sm = run.sm === null ? raw : run.sm * 0.6 + raw * 0.4;
+  const a = run.sm, e = run.ex;
+  if (run.key === 'plank') {
+    if (a >= e.hold) {
+      run.holdT += dt; run.res.plank = Math.max(run.res.plank || 0, run.holdT);
+      run.pts += e.pts * dt; setFb('Halten!', 'good');
+    } else setFb(a < e.hold - 25 ? 'Körper streckt sich nicht, Position prüfen' : 'Hüfte gerade halten', 'warn');
+    paintCount(); checkDone(); return;
+  }
+  if (!run.cycle && a < e.high - 15) { run.cycle = true; run.min = a; run.reached = false; }
+  if (run.cycle) {
+    run.min = Math.min(run.min, a);
+    if (a < e.low) { run.reached = true; setFb('Jetzt hoch', ''); }
+    if (a > e.high) {
+      run.cycle = false;
+      if (run.reached) { addRep(1); if (!run.lock) setFb(e.tipOk, 'good'); }
+      else setFb(e.tipLow, 'warn');
+    }
+  } else setFb('Bereit', '');
+}
+
+function loop() {
+  raf = requestAnimationFrame(loop);
+  if (!run || !landmarker || vid.readyState < 2 || vid.currentTime === lastVT) return;
+  lastVT = vid.currentTime;
+  const w = vid.videoWidth, h = vid.videoHeight;
+  if (cv.width !== w) { cv.width = w; cv.height = h; }
+  let res; try { res = landmarker.detectForVideo(vid, performance.now()); } catch (e) { return; }
+  ctx.clearRect(0, 0, w, h);
+  const lm = res.landmarks && res.landmarks[0];
+  if (!lm) { setFb('Niemand im Bild', 'warn'); return; }
+  ctx.lineWidth = 4; ctx.strokeStyle = '#7f9bff'; ctx.fillStyle = '#fff';
+  POSE_LINES.forEach(([a, b]) => { if ((lm[a].visibility ?? 0) > .5 && (lm[b].visibility ?? 0) > .5) { ctx.beginPath(); ctx.moveTo(lm[a].x * w, lm[a].y * h); ctx.lineTo(lm[b].x * w, lm[b].y * h); ctx.stroke(); } });
+  [11,12,13,14,15,16,23,24,25,26,27,28].forEach(i => { if ((lm[i].visibility ?? 0) > .5) { ctx.beginPath(); ctx.arc(lm[i].x * w, lm[i].y * h, 5, 0, 7); ctx.fill(); } });
+  update(lm, w, h, performance.now());
+}
+
+function overlay(html) { const o = $('ov'); o.hidden = !html; o.firstElementChild.innerHTML = html || ''; }
+
+async function begin(plan) {
+  $('home').hidden = true; $('done').hidden = true; $('work').hidden = false;
+  run = { plan, i: 0, res: {}, pts: 0, t0: Date.now(), lock: 1 };
+  try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); audio.resume && audio.resume(); } catch (e) {}
+  overlay('<div class="spin"></div><p>Kamera und Erkennung werden gestartet …</p>');
+  try {
+    await openCamera();
+  } catch (e) {
+    overlay('<h2>Keine Kamera</h2><p>Der Kamerazugriff wurde nicht erlaubt oder ist nicht verfügbar. Erlaube die Kamera in den Browser-Einstellungen und starte neu.</p><button class="primary" id="ov-back">Zurück</button>');
+    return;
+  }
+  try {
+    await loadModel();
+  } catch (e) {
+    closeCamera();
+    overlay('<h2>Modell nicht geladen</h2><p>Die Körpererkennung konnte nicht geladen werden. Prüfe die Internetverbindung und versuche es erneut.</p><button class="primary" id="ov-back">Zurück</button>');
+    return;
+  }
+  if (!run) { closeCamera(); return; }
+  startStep(0); run.lock = 0;
+  overlay('<h2>' + run.ex.name + '</h2><p>Stelle das Handy fest hin und die Kamera ' + run.ex.view + '. Ganzer Körper muss im Bild sein.</p><button class="primary" id="ov-go">Los</button>');
+  run.lock = 1;
+}
+
+function finish() {
+  closeCamera();
+  const res = {}; for (const k in run.res) if (run.res[k] > 0) res[k] = k === 'plank' ? Math.round(run.res[k]) : run.res[k];
+  const pts = Math.round(run.pts), secs = Math.round((Date.now() - run.t0) / 1000);
+  const had = Object.keys(res).length > 0;
+  let fresh = [];
+  if (had) {
+    store.sessions.push({ d: dkey(new Date()), pts, res, secs });
+    const st = stats();
+    ACH.forEach(a => { if (!store.got.includes(a[0]) && a[3](st)) { store.got.push(a[0]); fresh.push(a); } });
+    persist();
+  }
+  run = null;
+  $('work').hidden = true;
+  const d = $('done'); d.hidden = false;
+  d.innerHTML = '<h2>' + (had ? 'Geschafft' : 'Beendet') + '</h2>' +
+    (had ? '<div class="sum"><div><b class="num">' + pts + '</b><span class="label">Punkte</span></div><div><b class="num">' + Math.max(1, Math.round(secs / 60)) + '</b><span class="label">Minuten</span></div></div>' +
+      '<div class="card">' + Object.keys(res).map(k => '<div style="display:flex;justify-content:space-between"><span>' + EX[k].name + '</span><b class="num">' + res[k] + (k === 'plank' ? ' s' : '×') + '</b></div>').join('') + '</div>' : '<p class="note">Es wurden keine Wiederholungen gezählt.</p>') +
+    (fresh.length ? '<div><div class="label" style="margin-bottom:10px">Neuer Erfolg</div><div class="badges">' + fresh.map(a => '<div class="badge"><b>' + a[1] + '</b>' + a[2] + '</div>').join('') + '</div></div>' : '') +
+    '<button class="primary" id="home-btn">Zur Übersicht</button>';
+}
+
+/* ---------- Events ---------- */
+document.addEventListener('click', e => {
+  const t = e.target.closest('button'); if (!t) return;
+  if (t.dataset.plan) begin(PLANS.filter(p => p.id === t.dataset.plan)[0].steps);
+  else if (t.dataset.free) { const k = t.dataset.free; begin([[k, k === 'plank' ? 30 : 15]]); }
+  else if (t.id === 'ov-go') { overlay(''); run.lock = 0; run.lastT = performance.now(); setFb('Bereit', ''); cancelAnimationFrame(raf); loop(); }
+  else if (t.id === 'ov-back') { closeCamera(); run = null; $('work').hidden = true; $('home').hidden = false; }
+  else if (t.id === 'plus') addRep(1);
+  else if (t.id === 'minus') addRep(-1);
+  else if (t.id === 'skip') { if (run && !run.lock) next(); }
+  else if (t.id === 'stop') finish();
+  else if (t.id === 'home-btn') { $('done').hidden = true; $('home').hidden = false; renderHome(); }
+});
+
+if (!window.isSecureContext || !navigator.mediaDevices) {
+  const w = $('envwarn'); w.hidden = false;
+  w.textContent = 'Die Kamera funktioniert nur, wenn diese Seite über HTTPS (oder localhost) geöffnet wird, nicht als lokale Datei.';
+}
+renderHome();
+</script>
+</body>
+</html>
+
+</body></html>
