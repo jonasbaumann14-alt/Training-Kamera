@@ -228,6 +228,7 @@ textarea { min-height: 90px; resize: vertical; font-size: 13px; }
     <div id="v-plan" class="wrap" style="padding:0;gap:20px" hidden></div>
     <div id="v-act" class="wrap" style="padding:0;gap:20px" hidden></div>
     <div id="v-lb" class="wrap" style="padding:0;gap:20px" hidden></div>
+    <div id="v-music" class="wrap" style="padding:0;gap:20px" hidden></div>
     <div id="v-prog" class="wrap" style="padding:0;gap:20px" hidden></div>
     <div id="v-me" class="wrap" style="padding:0;gap:20px" hidden></div>
   </div>
@@ -330,7 +331,7 @@ let cloud = null, cu = null, pushT = 0, canPush = false, dirty = false;
 /* ================= Speicher ================= */
 let storageOk = true;
 function loadDB() {
-  const empty = { v: 1, profile: null, sessions: [], got: [], steps: {}, updatedAt: 0 };
+  const empty = { v: 1, profile: null, sessions: [], got: [], steps: {}, music: [], updatedAt: 0 };
   try {
     const s = JSON.parse(localStorage.getItem(KEY) || 'null');
     if (s && Array.isArray(s.sessions)) return Object.assign(empty, s, { got: s.got || [] });
@@ -457,10 +458,11 @@ function adjust(k, mult) {
 let tab = 'today';
 function setTab(t) {
   tab = t;
-  ['today','plan','act','prog','me','lb'].forEach(x => { $('v-' + x).hidden = x !== t; });
+  ['today','plan','act','prog','me','lb','music'].forEach(x => { $('v-' + x).hidden = x !== t; });
   document.querySelectorAll('#nav button').forEach(b => b.setAttribute('aria-current', b.dataset.tab === t));
   window.scrollTo(0, 0);
   if (t === 'lb') renderLb();
+  if (t === 'music') renderMusic();
 }
 function showScreen(id) {
   ['boot','home','onb','auth','work','done'].forEach(s => { $(s).hidden = s !== id; });
@@ -549,6 +551,7 @@ function renderToday() {
     '<div><div class="label">Diese Woche</div><b>' + st.weekCount + ' von ' + p.days.length + ' Einheiten</b></div></div>' + weekDots() + '</div>' +
     rankCard(st) +
     (cloud && cu ? '<button class="item" data-tab="lb"><h3>Rangliste</h3><p class="num">' + myPlace() + '</p><span class="go">Ansehen →</span></button>' : '') +
+    '<button class="item" data-tab="music"><h3>Musik</h3><p>' + ((DB.music || []).length ? (DB.music.length + ' Playlist' + (DB.music.length > 1 ? 's' : '')) : 'Spotify und Apple Music verknüpfen') + '</p><span class="go">Öffnen →</span></button>' +
     '<div><div class="label" style="margin-bottom:10px">Freies Training</div><div class="list">' +
     KEYS.filter(k => !p.limits.some(l => LIM[l] && LIM[l].indexOf(k) >= 0)).map(k => '<button class="item" data-free="' + k + '"><h3>' + EX[k].name + '</h3><p>Kamera ' + EX[k].view + '</p><span class="go">Los →</span></button>').join('') + '</div></div>';
 }
@@ -623,6 +626,48 @@ function renderMe() {
     adminCard() +
     '<div><div class="label" style="margin-bottom:10px">Zurücksetzen</div><div style="display:flex;flex-direction:column;gap:10px"><button class="ghost danger" data-act="wipe1" id="wipe">Alle Daten löschen</button>' + delCard() + '</div></div>';
 }
+
+/* ================= Musik (Playlist-Links) ================= */
+const MUSIC_HOSTS = { 'open.spotify.com': 'spotify', 'spotify.link': 'spotify', 'spotify.app.link': 'spotify', 'music.apple.com': 'apple' };
+function musicKind(u) {
+  try {
+    const x = new URL(String(u));
+    if (x.protocol !== 'https:' || x.username || x.password) return '';
+    return MUSIC_HOSTS[x.hostname.toLowerCase()] || '';
+  } catch (e) { return ''; }
+}
+let musicMsg = '', musicArm = -1;
+function renderMusic() {
+  if (!DB.profile) return;
+  const list = DB.music || [];
+  const rows = list.map((m, i) => {
+    const k = musicKind(m.url);
+    return '<div class="item" style="cursor:default"><h3>' + esc(m.name) + '</h3><p>' + (k === 'spotify' ? 'Spotify' : 'Apple Music') + '</p>' +
+      '<span class="go" style="display:flex;gap:8px"><a class="ghost" style="padding:8px 14px;width:auto;text-decoration:none;color:var(--accent)" href="' + esc(m.url) + '" target="_blank" rel="noopener noreferrer">Öffnen</a>' +
+      '<button class="ghost" style="padding:8px 14px;width:auto" data-mdel="' + i + '">' + (musicArm === i ? 'Sicher?' : 'Löschen') + '</button></span></div>';
+  }).join('');
+  $('v-music').innerHTML =
+    '<div class="top"><h1>Musik</h1><p>Deine Playlists für das Training. Starte die Musik zuerst, dann komm zurück und beginne die Einheit.</p></div>' +
+    (rows ? '<div class="list">' + rows + '</div>' : '<div class="card"><p class="muted" style="margin:0">Noch keine Playlist gespeichert.</p></div>') +
+    '<div class="card" style="display:flex;flex-direction:column;gap:10px"><div class="label">Playlist hinzufügen</div>' +
+    '<input id="mu-name" type="text" maxlength="30" placeholder="Name, z. B. Workout" autocomplete="off">' +
+    '<input id="mu-url" type="text" inputmode="url" placeholder="Link von Spotify oder Apple Music" autocomplete="off">' +
+    '<button class="primary" data-act="musave">Speichern</button><p id="mu-msg" class="muted" style="margin:0" role="status">' + esc(musicMsg) + '</p></div>' +
+    '<div class="card"><div class="label" style="margin-bottom:8px">Playlist finden</div><div style="display:flex;gap:10px;flex-wrap:wrap">' +
+    '<a class="ghost" style="text-decoration:none;text-align:center;flex:1;color:var(--accent)" href="https://open.spotify.com/search/workout" target="_blank" rel="noopener noreferrer">Spotify</a>' +
+    '<a class="ghost" style="text-decoration:none;text-align:center;flex:1;color:var(--accent)" href="https://music.apple.com/de/search?term=workout" target="_blank" rel="noopener noreferrer">Apple Music</a></div>' +
+    '<p class="muted" style="margin:12px 0 0;font-size:14px">Link kopieren: In Spotify bei der Playlist auf die drei Punkte, dann Teilen, dann Link kopieren. In Apple Music auf die drei Punkte, dann Teilen, dann Link kopieren. Hier einfügen und speichern.</p></div>';
+}
+function addMusic() {
+  const name = $('mu-name').value.trim().slice(0, 30), url = $('mu-url').value.trim();
+  const msg = t => { musicMsg = t; const m = $('mu-msg'); if (m) m.textContent = t; };
+  if (!name) { msg('Gib der Playlist einen Namen.'); return; }
+  if (!musicKind(url)) { msg('Das ist kein gültiger Spotify- oder Apple-Music-Link.'); return; }
+  if ((DB.music || []).length >= 10) { msg('Maximal 10 Playlists. Lösche zuerst eine.'); return; }
+  DB.music = (DB.music || []).concat([{ name, url }]);
+  musicMsg = 'Gespeichert.'; save(); renderMusic(); renderToday();
+}
+
 function renderAll() { renderToday(); renderPlan(); renderAct(); renderProg(); renderMe(); }
 
 /* ================= Einrichtung ================= */
@@ -971,7 +1016,9 @@ async function initCloud() {
   } catch (e) { return { status: 'fail' }; }
 }
 function normDB(o) {
-  const d = Object.assign({ v: 1, profile: null, sessions: [], got: [], steps: {}, updatedAt: 0 }, o || {});
+  const d = Object.assign({ v: 1, profile: null, sessions: [], got: [], steps: {}, music: [], updatedAt: 0 }, o || {});
+  if (!Array.isArray(d.music)) d.music = [];
+  d.music = d.music.filter(m => m && musicKind(m.url)).slice(0, 10);
   d.settings = Object.assign({}, SET_DEF, d.settings || {});
   return d;
 }
@@ -982,7 +1029,7 @@ function mergeDB(a, b) {
   a.sessions.concat(b.sessions).forEach(x => { const k = x.d + '|' + x.type + '|' + x.pts + '|' + x.secs; if (!seen[k]) { seen[k] = 1; sessions.push(x); } });
   sessions.sort((x, y) => x.d < y.d ? -1 : x.d > y.d ? 1 : 0);
   const got = Array.from(new Set(a.got.concat(b.got)));
-  return normDB({ v: 1, profile: newer.profile || older.profile, sessions, got, steps: Object.assign({}, older.steps, newer.steps), settings: newer.settings, updatedAt: Math.max(a.updatedAt || 0, b.updatedAt || 0) });
+  return normDB({ v: 1, profile: newer.profile || older.profile, sessions, got, steps: Object.assign({}, older.steps, newer.steps), settings: newer.settings, music: newer.music && newer.music.length ? newer.music : (older.music || []), updatedAt: Math.max(a.updatedAt || 0, b.updatedAt || 0) });
 }
 const docRef = () => cloud.fsM.doc(cloud.fdb, 'users', cu.uid);
 async function fetchRemote() {
@@ -1243,6 +1290,11 @@ document.addEventListener('click', e => {
     return;
   }
   if (d.lbp) { lbPeriod = d.lbp; drawLb(); return; }
+  if (d.mdel !== undefined) {
+    const i = Number(d.mdel);
+    if (musicArm !== i) { musicArm = i; renderMusic(); return; }
+    DB.music.splice(i, 1); musicArm = -1; musicMsg = ''; save(); renderMusic(); renderToday(); return;
+  }
   if (d.admban) { admAct('ban', d.admban, t); return; }
   if (d.admdel) {
     if (d.armed !== '1') { d.armed = '1'; t.textContent = 'Sicher? Nochmal tippen'; return; }
@@ -1250,7 +1302,8 @@ document.addEventListener('click', e => {
   }
   if (d.themeSet) { DB.settings.theme = d.themeSet; save(); applyTheme(); renderAll(); return; }
   if (d.act) {
-    if (d.act === 'redo') startOnboarding();
+    if (d.act === 'musave') addMusic();
+    else if (d.act === 'redo') startOnboarding();
     else if (d.act === 'stepsave') {
       const v = parseInt($('st-in').value, 10);
       if (isNaN(v) || v < 0 || v > 100000) { $('stmsg').textContent = 'Gib eine Zahl zwischen 0 und 100 000 ein.'; return; }
