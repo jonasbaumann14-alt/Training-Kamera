@@ -182,7 +182,7 @@ textarea { min-height: 90px; resize: vertical; font-size: 13px; }
 #work { position: fixed; inset: 0; background: #000; color: #fff; display: flex; flex-direction: column; z-index: 30;
   padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0); }
 .stage { position: relative; flex: 1; min-height: 0; overflow: hidden; background: #000; }
-.stage video, .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.stage video, #cv { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
 .hud-top { position: absolute; top: 0; left: 0; right: 0; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px; background: linear-gradient(#000b, #0000); }
 .hud-top h2 { font-size: 22px; color: #fff; }
 .hud-top .label { color: #ffffffb0; }
@@ -201,7 +201,10 @@ textarea { min-height: 90px; resize: vertical; font-size: 13px; }
 .ctrl { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 10px 16px 14px; background: #000; }
 .ctrl button { padding: 14px 4px; border-radius: 14px; background: #1b2130; color: #fff; font-weight: 700; font-size: 14px; }
 .ctrl .stop { color: #ff6b6b; }
-.overlay { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; background: #000d; color: #fff; padding: 24px; }
+.overlay { position: absolute; inset: 0; display: flex; overflow: auto; text-align: center; background: #000d; color: #fff; padding: 24px; }
+.overlay > div { margin: auto; }
+.demo { width: 100%; max-width: 300px; aspect-ratio: 3 / 2; height: auto; border-radius: 18px; background: #ffffff14; touch-action: none; cursor: grab; }
+.demotip { font-size: 15px; margin: 0; }
 .overlay > div { max-width: 360px; display: flex; flex-direction: column; gap: 14px; align-items: center; }
 .overlay h2 { font-size: 32px; color: #fff; }
 .overlay .primary, .overlay .ghost { color: #0a1030; }
@@ -779,7 +782,140 @@ function measure(lm, joints, w, h) {
   return vals.length ? vals.reduce((x, y) => x + y, 0) / vals.length : null;
 }
 function setFb(t, cls) { const f = $('fb'); f.textContent = t; f.className = 'fb ' + cls; f.hidden = !t; }
-function overlay(html) { const o = $('ov'); o.hidden = !html; o.firstElementChild.innerHTML = html || ''; }
+/* ================= 3D-Vorführung ================= */
+const DL = { shin: .42, thigh: .42, torso: .53, ua: .28, fa: .27, head: .25 };
+function linePose(sx, sy, w, hold) {
+  const phi = Math.asin((sy - .10) / 1.37), ax = sx - 1.37 * Math.cos(phi), k = .84 / 1.37;
+  return { hip: [ax + (sx - ax) * k, .10 + (sy - .10) * k], u: 90 - phi * 180 / Math.PI, h: 90 - phi * 180 / Math.PI, aF: [ax, .10], aB: [ax, .10], w: w };
+}
+const DEMO = {
+  squat: { wm: 'r', kp: [[1, 0], [1, 0]], ep: [0, -1], t: [.5, 1.3, .7], tip: 'Füße schulterbreit, Brust hoch. Hüfte nach hinten und unten, die Knie zeigen über die Füße.',
+    A: { hip: [0, .91], u: 0, h: 0, aF: [0, .08], aB: [0, .08], w: [.04, -.52] }, B: { hip: [-.25, .52], u: 35, h: 20, aF: [0, .08], aB: [0, .08], w: [.5, 0] } },
+  lunge: { wm: 'r', kp: [[1, .2], [-.3, -1]], ep: [0, -1], t: [.5, 1.4, .6], tip: 'Großer Schritt nach vorn. Das hintere Knie sinkt Richtung Boden, der Oberkörper bleibt aufrecht.',
+    A: { hip: [0, .91], u: 0, h: 0, aF: [0, .08], aB: [0, .08], w: [0, -.53] }, B: { hip: [0, .60], u: 0, h: 0, aF: [.5, .08], aB: [-.5, .14], w: [0, -.53] } },
+  pushup: { wm: 'a', kp: [[0, 1], [0, 1]], ep: [-1, .2], t: [.5, 1.2, .5], tip: 'Der Körper bildet eine gerade Linie. Ellbogen schräg nach hinten, Brust fast bis zum Boden, dann hochdrücken.',
+    A: linePose(0, .60, [0, .05]), B: linePose(0, .20, [0, .05]) },
+  situp: { wm: 't', kp: [[0, 1], [0, 1]], ep: 'p', t: [.5, 1.4, .5], tip: 'Knie angewinkelt, Arme vor der Brust. Den Oberkörper kontrolliert aufrollen und nicht am Nacken ziehen.',
+    A: { hip: [-.45, .12], u: 270, h: 270, aF: [0, .08], aB: [0, .08], w: [-.2, .12] }, B: { hip: [-.45, .12], u: 380, h: 395, aF: [0, .08], aB: [0, .08], w: [-.2, .12] } },
+  bridge: { wm: 'a', kp: [[0, 1], [0, 1]], ep: [0, 1], t: [.5, 1.3, .9], tip: 'Füße fest am Boden. Hüfte anheben, bis Schulter, Hüfte und Knie eine Linie bilden. Oben kurz anspannen.',
+    A: { hip: [-.45, .12], u: 270, h: 270, aF: [0, .08], aB: [0, .08], w: [-.55, .05] }, B: { hip: [-.61, .50], u: 224, h: 270, aF: [0, .08], aB: [0, .08], w: [-.55, .05] } },
+  plank: { wm: 'a', kp: [[0, 1], [0, 1]], ep: [-1, -1], t: [.8, .8, .8], armW: .13, tip: 'Ellbogen unter den Schultern. Der Körper bildet eine gerade Linie, Bauch und Po sind angespannt. Nicht durchhängen.',
+    A: linePose(0, .30, [.27, .03]), B: linePose(0, .315, [.27, .03]) },
+  wallsit: { wm: 'r', kp: [[1, 0], [1, 0]], ep: [-1, -.3], wall: -.26, t: [.5, 1.3, 1.8], tip: 'Rücken an der Wand, Knie im rechten Winkel über den Fersen. Die Position ruhig halten.',
+    A: { hip: [-.15, .78], u: 0, h: 0, aF: [.27, .08], aB: [.27, .08], w: [.3, -.45] }, B: { hip: [-.15, .50], u: 0, h: 0, aF: [.27, .08], aB: [.27, .08], w: [.3, -.45] } }
+};
+const dsub = (a, b) => [a[0] - b[0], a[1] - b[1]];
+function dik(a, b, l1, l2, pref) {
+  const v = dsub(b, a), d = Math.hypot(v[0], v[1]) || 1e-6, dir = [v[0] / d, v[1] / d];
+  if (d >= l1 + l2 - 1e-4) { const m = Math.min(l1, d); return [a[0] + dir[0] * m, a[1] + dir[1] * m]; }
+  const al = (l1 * l1 - l2 * l2 + d * d) / (2 * d), h = Math.sqrt(Math.max(0, l1 * l1 - al * al)), pp = [-dir[1], dir[0]];
+  const c1 = [a[0] + dir[0] * al + pp[0] * h, a[1] + dir[1] * al + pp[1] * h], c2 = [a[0] + dir[0] * al - pp[0] * h, a[1] + dir[1] * al - pp[1] * h];
+  const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], s = c => (c[0] - mid[0]) * pref[0] + (c[1] - mid[1]) * pref[1];
+  return s(c1) >= s(c2) ? c1 : c2;
+}
+function dmix(p, q, t) {
+  const m = (a, b) => a + (b - a) * t, m2 = (a, b) => [m(a[0], b[0]), m(a[1], b[1])];
+  return { hip: m2(p.hip, q.hip), u: m(p.u, q.u), h: m(p.h, q.h), aF: m2(p.aF, q.aF), aB: m2(p.aB, q.aB), w: m2(p.w, q.w) };
+}
+function dbuild(D, p) {
+  const rad = a => a * Math.PI / 180, ax = a => [Math.sin(rad(a)), Math.cos(rad(a))];
+  const sh = [p.hip[0] + ax(p.u)[0] * DL.torso, p.hip[1] + ax(p.u)[1] * DL.torso];
+  const hd = [sh[0] + ax(p.h)[0] * DL.head, sh[1] + ax(p.h)[1] * DL.head];
+  let wr;
+  if (D.wm === 'a') wr = p.w; else if (D.wm === 'r') wr = [sh[0] + p.w[0], sh[1] + p.w[1]];
+  else { const a = ax(p.u), pe = [Math.cos(rad(p.u)), -Math.sin(rad(p.u))]; wr = [sh[0] + a[0] * p.w[0] + pe[0] * p.w[1], sh[1] + a[1] * p.w[0] + pe[1] * p.w[1]]; }
+  const pu = [Math.cos(rad(p.u)), -Math.sin(rad(p.u))], ep = D.ep === 'p' ? pu : D.ep;
+  const el = dik(sh, wr, DL.ua, DL.fa, ep);
+  const legs = [[p.aF, D.kp[0]], [p.aB, D.kp[1]]].map(([an, kp]) => {
+    const kn = dik(p.hip, an, DL.thigh, DL.shin, kp), toe = an[1] > .11 ? [an[0] + .07, .02] : [an[0] + .13, Math.max(0, an[1] - .05)];
+    return { kn, an, toe };
+  });
+  return { sh, hd, el, wr, legs, hip: p.hip };
+}
+let demoRaf = 0, demoYaw = 30;
+function demoStop() { cancelAnimationFrame(demoRaf); demoRaf = 0; }
+function demoHtml(k) { return '<canvas class="demo" id="demo" data-ex="' + k + '" width="600" height="400" aria-label="3D-Vorführung: ' + EX[k].name + '"></canvas><p class="demotip">' + DEMO[k].tip + '</p>'; }
+function demoStart(c, k) {
+  const D = DEMO[k]; if (!D) return;
+  const g = c.getContext('2d'), W = c.width, H = c.height, hl = EX[k].j[0][1];
+  const HLN = { 25: 'knee', 13: 'elbow', 23: 'hip' }[hl] || 'knee';
+  let mnx = 9, mxx = -9, mny = 9, mxy = -9;
+  [D.A, D.B].forEach(p => { const b = dbuild(D, p); [b.sh, b.hd, b.el, b.wr, b.hip].concat(b.legs.map(l => l.kn), b.legs.map(l => l.an), b.legs.map(l => l.toe)).forEach(q => { mnx = Math.min(mnx, q[0]); mxx = Math.max(mxx, q[0]); mny = Math.min(mny, q[1]); mxy = Math.max(mxy, q[1]); }); });
+  const cx = (mnx + mxx) / 2, cy = (mny + mxy) / 2, R = Math.max(mxx - mnx, mxy - mny, 1.2) / 2 + .15, sc = Math.min(W, H) * .5 / R * .95, DIST = 5;
+  let drag = null; const t0 = performance.now();
+  c.onpointerdown = e => { drag = e.clientX; try { c.setPointerCapture(e.pointerId); } catch (x) {} };
+  c.onpointermove = e => { if (drag !== null) { demoYaw += (e.clientX - drag) * .6; drag = e.clientX; } };
+  c.onpointerup = c.onpointercancel = () => { drag = null; };
+  const ease = x => x * x * (3 - 2 * x);
+  function frame(now) {
+    if (!c.isConnected || $('ov').hidden) { demoRaf = 0; return; }
+    const t = (now - t0) / 1000, [ha, mv, hb] = D.t, T = ha + mv + hb + mv, ph = t % T;
+    let s; if (ph < ha) s = 0; else if (ph < ha + mv) s = ease((ph - ha) / mv); else if (ph < ha + mv + hb) s = 1; else s = 1 - ease((ph - ha - mv - hb) / mv);
+    const B = dbuild(D, dmix(D.A, D.B, s));
+    const yaw = (demoYaw + (drag === null ? 38 * Math.sin(t * .55) : 0)) * Math.PI / 180, pit = 14 * Math.PI / 180;
+    const P = (x, y, z) => {
+      const X = x - cx, Y = y - cy, x1 = X * Math.cos(yaw) + z * Math.sin(yaw), z1 = -X * Math.sin(yaw) + z * Math.cos(yaw);
+      const y2 = Y * Math.cos(pit) - z1 * Math.sin(pit), z2 = Y * Math.sin(pit) + z1 * Math.cos(pit), f = DIST / (DIST + z2);
+      return { x: W / 2 + x1 * sc * f, y: H / 2 - y2 * sc * f, d: z2, f };
+    };
+    g.clearRect(0, 0, W, H);
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    g.strokeStyle = 'rgba(255,255,255,.13)'; g.lineWidth = 1.5;
+    for (let i = -6; i <= 6; i++) {
+      const a = P(cx + i * .4, 0, -1.2), b = P(cx + i * .4, 0, 1.2), c1 = P(cx - 2.4, 0, i * .2), c2 = P(cx + 2.4, 0, i * .2);
+      g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke(); g.beginPath(); g.moveTo(c1.x, c1.y); g.lineTo(c2.x, c2.y); g.stroke();
+    }
+    if (D.wall !== undefined) {
+      const q = [P(D.wall, 0, -1), P(D.wall, 0, 1), P(D.wall, 1.7, 1), P(D.wall, 1.7, -1)];
+      g.fillStyle = 'rgba(255,255,255,.10)'; g.beginPath(); q.forEach((p, i) => i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)); g.closePath(); g.fill();
+    }
+    const aw = D.armW || .2, J = {}, items = [];
+    const zs = [-1, 1];
+    const hipP = zs.map(sg => P(B.hip[0], B.hip[1], sg * .09)), shP = zs.map(sg => P(B.sh[0], B.sh[1], sg * .17));
+    const seg = (a, b, w, key) => items.push({ d: (a.d + b.d) / 2, k: 'seg', a, b, w, key });
+    zs.forEach((sg, i) => {
+      const leg = B.legs[i], kn = P(leg.kn[0], leg.kn[1], sg * .11), an = P(leg.an[0], leg.an[1], sg * .10), toe = P(leg.toe[0], leg.toe[1], sg * .10);
+      seg(hipP[i], kn, .1, 'k' + i); seg(kn, an, .08, 'k' + i); seg(an, toe, .06, 'k' + i);
+      const el = P(B.el[0], B.el[1], sg * (aw + .03)), wr = P(B.wr[0], B.wr[1], sg * aw);
+      seg(shP[i], el, .07, 'a' + i); seg(el, wr, .06, 'a' + i);
+      J['knee' + i] = kn; J['elbow' + i] = el; J['hip' + i] = hipP[i];
+    });
+    items.push({ d: (hipP[0].d + hipP[1].d + shP[0].d + shP[1].d) / 4, k: 'torso', q: [hipP[0], hipP[1], shP[1], shP[0]] });
+    const hp = P(B.hd[0], B.hd[1], 0); items.push({ d: hp.d, k: 'head', p: hp });
+    const nk = P(B.sh[0], B.sh[1], 0); seg(nk, P(B.sh[0] + (B.hd[0] - B.sh[0]) * .55, B.sh[1] + (B.hd[1] - B.sh[1]) * .55, 0), .07, 'n');
+    let dmin = 1e9, dmax = -1e9; items.forEach(o => { dmin = Math.min(dmin, o.d); dmax = Math.max(dmax, o.d); });
+    // Schatten
+    g.strokeStyle = 'rgba(0,0,0,.35)';
+    zs.forEach((sg, i) => {
+      const leg = B.legs[i], pts = [[B.hip[0], sg * .09], [leg.kn[0], sg * .11], [leg.an[0], sg * .10], [leg.toe[0], sg * .10]].map(q => P(q[0], 0, q[1]));
+      g.lineWidth = .08 * sc * pts[0].f; g.beginPath(); pts.forEach((p, j) => j ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)); g.stroke();
+    });
+    const a0 = P(B.hip[0], 0, 0), a1 = P(B.sh[0], 0, 0); g.lineWidth = .16 * sc * a0.f; g.beginPath(); g.moveTo(a0.x, a0.y); g.lineTo(a1.x, a1.y); g.stroke();
+    items.sort((p, q) => q.d - p.d);
+    const shade = d => .55 + .45 * (1 - (d - dmin) / ((dmax - dmin) || 1));
+    items.forEach(o => {
+      const al = shade(o.d);
+      if (o.k === 'seg') {
+        g.strokeStyle = 'rgba(' + (o.key[0] === 'k' || o.key[0] === 'a' ? '226,240,232' : '236,246,240') + ',' + al + ')';
+        g.lineWidth = o.w * sc * ((o.a.f + o.b.f) / 2); g.beginPath(); g.moveTo(o.a.x, o.a.y); g.lineTo(o.b.x, o.b.y); g.stroke();
+      } else if (o.k === 'torso') {
+        g.fillStyle = 'rgba(210,232,220,' + al + ')'; g.strokeStyle = g.fillStyle; g.lineWidth = .07 * sc * o.q[0].f;
+        g.beginPath(); o.q.forEach((p, i) => i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)); g.closePath(); g.fill(); g.stroke();
+      } else {
+        g.fillStyle = 'rgba(244,250,246,' + al + ')'; g.beginPath(); g.arc(o.p.x, o.p.y, .115 * sc * o.p.f, 0, 7); g.fill();
+      }
+    });
+    g.fillStyle = '#4cc38a';
+    zs.forEach((sg, i) => { const q = J[HLN + i]; if (q) { g.beginPath(); g.arc(q.x, q.y, .055 * sc * q.f, 0, 7); g.fill(); } });
+    demoRaf = requestAnimationFrame(frame);
+  }
+  demoRaf = requestAnimationFrame(frame);
+}
+
+function overlay(html) {
+  demoStop(); const o = $('ov'); o.hidden = !html; o.firstElementChild.innerHTML = html || '';
+  const c = $('demo'); if (html && c) demoStart(c, c.dataset.ex);
+}
 
 function startStep(i) {
   run.i = i; const [k, target] = run.plan[i];
@@ -827,7 +963,7 @@ function next() {
 function restThen(idx, secs) {
   run.lock = 2; run.restNext = idx;
   const nx = run.plan[idx], same = nx[0] === run.key, end = Date.now() + secs * 1000;
-  overlay('<h2>Pause</h2><div class="restn num" id="restn">' + secs + '</div><p>Als Nächstes: <b>' + EX[nx[0]].name + '</b>, ' + nx[1] + (EX[nx[0]].hold ? ' Sekunden' : ' Wiederholungen') +
+  overlay('<h2>Pause</h2><div class="restn num" id="restn">' + secs + '</div>' + demoHtml(nx[0]) + '<p>Als Nächstes: <b>' + EX[nx[0]].name + '</b>, ' + nx[1] + (EX[nx[0]].hold ? ' Sekunden' : ' Wiederholungen') +
     (same ? '' : '<br>Kamera ' + EX[nx[0]].view + ', ganzer Körper im Bild') + '</p><button class="ghost" id="rest-skip">Pause beenden</button>');
   clearInterval(run.rt);
   run.rt = setInterval(() => {
@@ -965,7 +1101,7 @@ async function begin(session) {
   if (!run) { closeCamera(); return; }
   startStep(0); run.lock = 1;
   cancelAnimationFrame(raf); lastVT = -1; loop();
-  overlay('<h2>' + run.ex.name + '</h2><p>Stelle das Handy fest hin, die Kamera ' + run.ex.view + '. Der ganze Körper muss im Bild sein.<br>Nur saubere Wiederholungen werden gezählt. Bei einem Fehler hörst du einen Ton und siehst, was du verbessern sollst.<br>Ziel: ' + run.target + (run.ex.hold ? ' Sekunden' : ' Wiederholungen') + '</p><button class="primary" id="ov-go">Los</button>');
+  overlay(demoHtml(run.key) + '<h2>' + run.ex.name + '</h2><p>Stelle das Handy fest hin, die Kamera ' + run.ex.view + '. Der ganze Körper muss im Bild sein.<br>Nur saubere Wiederholungen werden gezählt. Bei einem Fehler hörst du einen Ton und siehst, was du verbessern sollst.<br>Ziel: ' + run.target + (run.ex.hold ? ' Sekunden' : ' Wiederholungen') + '</p><button class="primary" id="ov-go">Los</button>');
 }
 
 function finish(completed) {
